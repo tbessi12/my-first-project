@@ -8,7 +8,7 @@ A simple Python utility for greeting users.
 python greet.py --name Alice
 ```
 
-## Instalation
+## Installation
 
 No dependencies required — just Python 3.
 
