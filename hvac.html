@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HVAC Diagnostic Tool</title>
+  <link rel="stylesheet" href="hvac.css" />
+</head>
+<body>
+
+<header>
+  <div class="logo">❄️ HVAC Diagnostic Tool</div>
+  <div class="subtitle">Refrigerant & Airflow Diagnostics Only · No Electrical</div>
+</header>
+
+<main>
+
+  <!-- ── STEP 1: System Setup ─────────────────── -->
+  <section class="card" id="card-setup">
+    <h2 class="card-title">1 · System Setup</h2>
+    <div class="setup-grid">
+
+      <div class="field">
+        <label>System Type</label>
+        <select id="system-type">
+          <option value="split">Split System</option>
+          <option value="package">Package Unit</option>
+          <option value="minisplit">Mini-Split</option>
+          <option value="heatpump">Heat Pump (Split)</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Refrigerant</label>
+        <select id="refrigerant">
+          <option value="R410A">R-410A</option>
+          <option value="R22">R-22</option>
+          <option value="R32">R-32</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Metering Device</label>
+        <select id="metering">
+          <option value="txv">TXV / EEV</option>
+          <option value="fixed">Fixed Orifice / Piston</option>
+        </select>
+      </div>
+
+      <div class="field" id="mode-field">
+        <label>Operating Mode</label>
+        <div class="mode-toggle">
+          <button class="mode-btn active" data-mode="cooling">❄️ Cooling</button>
+          <button class="mode-btn" data-mode="heating">🔥 Heating</button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── STEP 2: Readings ─────────────────────── -->
+  <section class="card" id="card-readings">
+    <h2 class="card-title">2 · Field Readings</h2>
+
+    <div class="readings-grid">
+
+      <!-- Pressures -->
+      <div class="readings-group">
+        <h3 class="group-title">📊 Pressures</h3>
+
+        <div class="field">
+          <label id="lbl-suction">Suction Pressure <span class="unit">(psig)</span></label>
+          <input type="number" id="suction-press" placeholder="e.g. 130" min="0" max="800" />
+          <div class="calc-out" id="out-evap-sat">— Evap Sat Temp: —</div>
+        </div>
+
+        <div class="field">
+          <label id="lbl-discharge">Discharge Pressure <span class="unit">(psig)</span></label>
+          <input type="number" id="discharge-press" placeholder="e.g. 375" min="0" max="800" />
+          <div class="calc-out" id="out-cond-sat">— Cond Sat Temp: —</div>
+        </div>
+
+      </div>
+
+      <!-- Line Temps -->
+      <div class="readings-group">
+        <h3 class="group-title">🌡️ Line Temperatures</h3>
+
+        <div class="field">
+          <label id="lbl-suction-temp">Suction Line Temp <span class="unit">(°F)</span></label>
+          <input type="number" id="suction-temp" placeholder="e.g. 55" />
+          <div class="calc-out" id="out-superheat">— Superheat: —</div>
+        </div>
+
+        <div class="field">
+          <label>Liquid Line Temp <span class="unit">(°F)</span></label>
+          <input type="number" id="liquid-temp" placeholder="e.g. 100" />
+          <div class="calc-out" id="out-subcooling">— Subcooling: —</div>
+        </div>
+
+      </div>
+
+      <!-- Air Temps -->
+      <div class="readings-group">
+        <h3 class="group-title">💨 Air Temperatures</h3>
+
+        <div class="field">
+          <label>Return Air Dry Bulb <span class="unit">(°F)</span></label>
+          <input type="number" id="return-db" placeholder="e.g. 75" />
+        </div>
+
+        <div class="field" id="wb-field">
+          <label>Return Air Wet Bulb <span class="unit">(°F)</span>
+            <span class="tip">needed for target SH</span>
+          </label>
+          <input type="number" id="return-wb" placeholder="e.g. 62" />
+        </div>
+
+        <div class="field">
+          <label>Supply Air Temp <span class="unit">(°F)</span></label>
+          <input type="number" id="supply-temp" placeholder="e.g. 55" />
+          <div class="calc-out" id="out-delta-t">— ΔT: —</div>
+        </div>
+
+        <div class="field">
+          <label id="lbl-outdoor">Outdoor Ambient <span class="unit">(°F)</span></label>
+          <input type="number" id="outdoor-temp" placeholder="e.g. 95" />
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Target values box -->
+    <div class="targets-bar" id="targets-bar">
+      <div class="target-item" id="target-sh-box">
+        <span class="target-lbl">Target Superheat</span>
+        <span class="target-val" id="target-sh-val">—</span>
+      </div>
+      <div class="target-item" id="target-sc-box">
+        <span class="target-lbl">Target Subcooling</span>
+        <span class="target-val" id="target-sc-val">—</span>
+      </div>
+      <div class="target-item">
+        <span class="target-lbl">Target ΔT</span>
+        <span class="target-val">16–22 °F</span>
+      </div>
+      <div class="target-item">
+        <span class="target-lbl">Compression Ratio</span>
+        <span class="target-val" id="out-comp-ratio">—</span>
+      </div>
+    </div>
+
+    <button class="btn-diagnose" id="btn-diagnose">🔍 Run Diagnosis</button>
+  </section>
+
+  <!-- ── STEP 3: Diagnosis ─────────────────────── -->
+  <section class="card hidden" id="card-results">
+    <h2 class="card-title">3 · Diagnosis</h2>
+
+    <div class="summary-row" id="summary-row"></div>
+
+    <div id="findings-list"></div>
+
+    <div class="actions-footer">
+      <button class="btn-secondary" id="btn-reset">↺ New Diagnosis</button>
+      <button class="btn-ghost" id="btn-print">🖨 Print Report</button>
+    </div>
+  </section>
+
+</main>
+
+<script src="hvac.js"></script>
+</body>
+</html>
