@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>USPS 955 Exam Prep</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════
+     NAV
+══════════════════════════════════════════════ -->
+<header>
+  <div class="logo">📬 USPS 955 Prep</div>
+  <nav>
+    <button class="nav-btn active" data-screen="home">Home</button>
+    <button class="nav-btn" data-screen="quiz">Practice Quiz</button>
+    <button class="nav-btn" data-screen="flashcards">Flashcards</button>
+    <button class="nav-btn" data-screen="scores">My Scores</button>
+  </nav>
+</header>
+
+<!-- ══════════════════════════════════════════════
+     HOME
+══════════════════════════════════════════════ -->
+<main id="screen-home" class="screen active">
+  <section class="hero">
+    <h1>Pass the USPS 955 Exam</h1>
+    <p>120 real practice questions across all tested topics — electronics, motors, hydraulics, welding, safety & more.</p>
+  </section>
+
+  <div class="stats-bar" id="home-stats"></div>
+
+  <section class="topic-grid" id="topic-grid"></section>
+
+  <div class="home-actions">
+    <button class="btn-primary" id="start-full-quiz">Start Full Practice Test (120 Q)</button>
+    <button class="btn-secondary" id="start-timed-quiz">⏱ Timed Mode (60 min)</button>
+    <button class="btn-ghost" id="start-flashcards-home">Review Flashcards</button>
+  </div>
+</main>
+
+<!-- ══════════════════════════════════════════════
+     QUIZ
+══════════════════════════════════════════════ -->
+<main id="screen-quiz" class="screen">
+
+  <!-- Setup panel -->
+  <div id="quiz-setup">
+    <h2>Configure Your Quiz</h2>
+    <div class="setup-options">
+      <div class="option-group">
+        <label>Question set</label>
+        <select id="quiz-set">
+          <option value="all">All 120 Questions</option>
+          <option value="1">Test 1 (Questions 1–40)</option>
+          <option value="2">Test 2 (Questions 41–75)</option>
+          <option value="3">Test 3 (Questions 76–100)</option>
+          <option value="4">Test 4 (Questions 101–120)</option>
+          <option value="wrong">My Wrong Answers</option>
+        </select>
+      </div>
+      <div class="option-group">
+        <label>Mode</label>
+        <select id="quiz-mode">
+          <option value="practice">Practice (see answer after each)</option>
+          <option value="test">Test Mode (answers at end)</option>
+          <option value="timed">Timed (60 minutes)</option>
+        </select>
+      </div>
+      <div class="option-group">
+        <label>Shuffle questions</label>
+        <label class="toggle"><input type="checkbox" id="quiz-shuffle" checked /><span class="slider"></span></label>
+      </div>
+    </div>
+    <button class="btn-primary" id="begin-quiz">Begin Quiz</button>
+  </div>
+
+  <!-- Active quiz -->
+  <div id="quiz-active" class="hidden">
+    <div class="quiz-header">
+      <div class="q-progress">
+        <span id="q-counter">Q 1 / 40</span>
+        <div class="progress-bar"><div class="progress-fill" id="q-progress-fill"></div></div>
+      </div>
+      <div id="timer-display" class="timer hidden">60:00</div>
+      <span id="q-topic" class="topic-badge"></span>
+    </div>
+
+    <div class="question-card" id="question-card">
+      <p id="q-text"></p>
+      <div id="q-options" class="options-grid"></div>
+      <div id="q-feedback" class="feedback hidden"></div>
+      <div class="quiz-controls">
+        <button class="btn-ghost" id="q-mark">🔖 Mark for Review</button>
+        <button class="btn-primary" id="q-next">Next →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="quiz-results" class="hidden">
+    <div class="results-card">
+      <div class="score-ring" id="score-ring">
+        <span id="score-pct">0%</span>
+      </div>
+      <h2 id="results-heading">Results</h2>
+      <p id="results-subtext"></p>
+      <div class="result-breakdown" id="result-breakdown"></div>
+      <div class="result-actions">
+        <button class="btn-primary" id="retry-quiz">Retry Quiz</button>
+        <button class="btn-secondary" id="review-wrong">Review Wrong Answers</button>
+        <button class="btn-ghost" id="back-to-setup">Back to Setup</button>
+      </div>
+    </div>
+    <div id="review-list" class="hidden review-list"></div>
+  </div>
+
+</main>
+
+<!-- ══════════════════════════════════════════════
+     FLASHCARDS
+══════════════════════════════════════════════ -->
+<main id="screen-flashcards" class="screen">
+  <div class="flashcard-header">
+    <h2>Flashcards</h2>
+    <span id="fc-counter">1 / 30</span>
+  </div>
+  <div class="fc-progress-bar"><div class="fc-progress-fill" id="fc-progress-fill"></div></div>
+
+  <div class="flashcard-wrap">
+    <div class="flashcard" id="flashcard">
+      <div class="fc-front">
+        <p id="fc-front-text"></p>
+        <span class="tap-hint">Tap to reveal →</span>
+      </div>
+      <div class="fc-back">
+        <p id="fc-back-text"></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="fc-controls">
+    <button class="btn-ghost" id="fc-prev">← Prev</button>
+    <div class="fc-rating">
+      <button class="btn-wrong" id="fc-wrong">✗ Need More Practice</button>
+      <button class="btn-right" id="fc-right">✓ Got It</button>
+    </div>
+    <button class="btn-ghost" id="fc-next">Next →</button>
+  </div>
+  <div class="fc-shuffle-row">
+    <button class="btn-ghost small" id="fc-shuffle">🔀 Shuffle</button>
+    <button class="btn-ghost small" id="fc-restart">↺ Restart</button>
+  </div>
+</main>
+
+<!-- ══════════════════════════════════════════════
+     SCORES
+══════════════════════════════════════════════ -->
+<main id="screen-scores" class="screen">
+  <h2>My Progress</h2>
+  <div id="scores-overview" class="scores-overview"></div>
+  <div id="scores-history" class="scores-history"></div>
+  <button class="btn-ghost" id="clear-scores">🗑 Clear All Data</button>
+</main>
+
+<script src="questions.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
