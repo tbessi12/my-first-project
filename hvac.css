@@ -77,6 +77,36 @@ main {
 
 .hidden { display: none !important; }
 
+/* ── Job bar ─────────────────────────────────── */
+.job-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1rem 1.25rem;
+}
+.job-field { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: .35rem; }
+.job-field input { width: 100%; }
+.job-actions { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.job-actions select {
+  padding: .55rem .7rem; border: 1.5px solid var(--border);
+  border-radius: 8px; font-size: .85rem; background: #FAFCFF;
+}
+
+.optional {
+  font-size: .72rem;
+  font-weight: 400;
+  color: var(--muted);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.calc-out.big {
+  font-size: 1.1rem;
+  font-weight: 800;
+  padding-top: .4rem;
+}
+
 /* ── Setup grid ──────────────────────────────── */
 .setup-grid {
   display: grid;

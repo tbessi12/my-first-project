@@ -23,6 +23,13 @@ const PT = {
     [130,47],[140,51],[150,55],[160,58],[175,64],[190,69],[210,75],
     [230,81],[250,87],[270,92],[300,101],[330,109],[360,117],[400,127],
     [440,137],[480,146]
+  ],
+  // R-454B (A2L) — bubble-point saturation, close to but slightly below R-410A
+  R454B: [
+    [50,1],[60,7],[70,13],[80,18],[90,23],[100,28],[110,32],[120,37],
+    [130,41],[140,45],[150,49],[160,52],[170,56],[180,59],[190,63],
+    [200,66],[220,72],[240,78],[260,84],[280,90],[300,95],[325,101],
+    [350,107],[375,112],[400,118],[425,123],[450,128],[475,133],[500,138]
   ]
 };
 
@@ -193,10 +200,25 @@ function updateTargetDisplay(od, wb) {
   }
 }
 
+// Total External Static Pressure (TESP) = |supply| + |return|
+function recalcStatic() {
+  const ss = val('supply-static');
+  const rs = val('return-static');
+  if (ss === null && rs === null) {
+    $('out-tesp').textContent = '— TESP: —';
+    return;
+  }
+  const tesp = Math.abs(ss || 0) + Math.abs(rs || 0);
+  $('out-tesp').textContent = `TESP: ${tesp.toFixed(2)} in. WC`;
+}
+
 // Wire all inputs for live updates
 ['suction-press','discharge-press','suction-temp','liquid-temp',
  'return-db','return-wb','supply-temp','outdoor-temp','refrigerant'].forEach(id => {
   $(id).addEventListener('input', recalcLive);
+});
+['supply-static','return-static','rated-esp'].forEach(id => {
+  $(id).addEventListener('input', recalcStatic);
 });
 
 // ══════════════════════════════════════════════
@@ -564,7 +586,99 @@ function runDiagnosis() {
     }
   }
 
-  // ── 7. Minimum data check ────────────────────
+  // ── 7. DUCT STATIC PRESSURE ──────────────────
+  const ss = val('supply-static');
+  const rs = val('return-static');
+  const ratedEsp = val('rated-esp');
+  if (ss !== null || rs !== null) {
+    const tesp = Math.abs(ss || 0) + Math.abs(rs || 0);
+    const limit = ratedEsp !== null ? ratedEsp : 0.5;
+    if (tesp > limit) {
+      const over = ((tesp - limit) / limit) * 100;
+      findings.push({
+        area: 'Static Pressure', sev: tesp > limit * 1.4 ? 'crit' : 'warn',
+        icon: '🌬️',
+        title: `High Total External Static — ${tesp.toFixed(2)}" WC (rated ${limit.toFixed(2)}")`,
+        detail: `TESP is ${over.toFixed(0)}% over the equipment's rated external static. High static chokes airflow (CFM), which directly causes airflow-side refrigerant symptoms (low ΔT split, low suction, coil freezing in cooling).`,
+        causes: [
+          'Undersized ductwork for the equipment CFM',
+          'Dirty air filter or overly restrictive high-MERV filter',
+          'Dirty evaporator/indoor coil',
+          'Closed or restricted dampers, registers, or grilles',
+          'Crushed, kinked, or collapsed flex duct',
+          'Undersized or dirty return air path',
+        ]
+      });
+      // Pinpoint which side is worse
+      if (ss !== null && rs !== null) {
+        if (Math.abs(rs) > Math.abs(ss)) {
+          findings.push({
+            area: 'Static Pressure', sev: 'info', icon: 'ℹ️',
+            title: `Return side is the bottleneck (${Math.abs(rs).toFixed(2)}" vs supply ${Math.abs(ss).toFixed(2)}")`,
+            detail: 'The return static is higher than supply. Focus on the return path — filter, return grille size, and return duct sizing.',
+            causes: []
+          });
+        } else {
+          findings.push({
+            area: 'Static Pressure', sev: 'info', icon: 'ℹ️',
+            title: `Supply side is the bottleneck (${Math.abs(ss).toFixed(2)}" vs return ${Math.abs(rs).toFixed(2)}")`,
+            detail: 'The supply static is higher than return. Focus on the supply path — coil cleanliness, supply duct sizing, dampers, and registers.',
+            causes: []
+          });
+        }
+      }
+    } else {
+      findings.push({
+        area: 'Static Pressure', sev: 'ok', icon: '✅',
+        title: `Static Pressure OK — ${tesp.toFixed(2)}" WC (rated ${limit.toFixed(2)}")`,
+        detail: 'Total external static pressure is at or below the equipment rating. Airflow restriction is unlikely to be a problem.',
+        causes: []
+      });
+    }
+  }
+
+  // ── 8. CHARGE CALCULATOR / GUIDANCE ──────────
+  // Uses subcooling for TXV/EEV, superheat for fixed orifice (cooling only)
+  if (mode === 'cooling') {
+    if (metering === 'txv' && sc !== null) {
+      const targetSC = 12; // mid of 10-20 typical OEM ~10-12
+      const diff = sc - targetSC;
+      if (Math.abs(diff) >= 3) {
+        const action = diff > 0 ? 'RECOVER' : 'ADD';
+        // ~ rule of thumb: ~2-3°F subcooling change per oz on typical residential
+        findings.push({
+          area: 'Charge', sev: 'info', icon: '⚖️',
+          title: `Charge Guidance — ${action} refrigerant (subcooling ${fmt(sc)}°F vs ~${targetSC}°F)`,
+          detail: diff > 0
+            ? `Subcooling is ${fmt(diff)}°F high → system is likely OVERCHARGED. Recover refrigerant in small increments, allowing 10–15 min to stabilize between adjustments. Confirm against the OEM data plate / charging chart.`
+            : `Subcooling is ${fmt(Math.abs(diff))}°F low → system is likely UNDERCHARGED. Add refrigerant in small increments (charge as liquid for blends like R-410A/R-454B), allowing 10–15 min to stabilize. ALWAYS check for and repair leaks before adding refrigerant.`,
+          causes: []
+        });
+      }
+    } else if (metering === 'fixed' && sh !== null && tsh !== null) {
+      const diff = sh - tsh;
+      if (Math.abs(diff) >= 5) {
+        const action = diff > 0 ? 'ADD' : 'RECOVER';
+        findings.push({
+          area: 'Charge', sev: 'info', icon: '⚖️',
+          title: `Charge Guidance — ${action} refrigerant (superheat ${fmt(sh)}°F vs target ${tsh}°F)`,
+          detail: diff > 0
+            ? `Superheat is ${fmt(diff)}°F above target → system is likely UNDERCHARGED. Add refrigerant slowly and re-measure target superheat (it shifts with indoor WB & outdoor DB). Verify airflow is correct FIRST — low airflow mimics undercharge. Check for leaks before charging.`
+            : `Superheat is ${fmt(Math.abs(diff))}°F below target → system is likely OVERCHARGED. Recover refrigerant slowly and re-measure. Verify airflow is not excessive.`,
+          causes: []
+        });
+      }
+    }
+  } else {
+    findings.push({
+      area: 'Charge', sev: 'info', icon: 'ℹ️',
+      title: 'Charge in heating mode — verify by weight',
+      detail: 'In heating mode, superheat/subcooling charging methods are unreliable. Verify charge by weight (recover, evacuate, weigh in per data plate) or use the manufacturer\'s heating-mode charging chart.',
+      causes: []
+    });
+  }
+
+  // ── 9. Minimum data check ────────────────────
   if ([sp, dp, st, lt].filter(v => v !== null).length < 2) {
     findings.unshift({
       area: 'Data', sev: 'info',
@@ -627,23 +741,98 @@ function findSev(findings, area) {
 }
 
 // ── Reset ─────────────────────────────────────
+const INPUT_IDS = ['suction-press','discharge-press','suction-temp','liquid-temp',
+  'return-db','return-wb','supply-temp','outdoor-temp',
+  'supply-static','return-static'];
+
 $('btn-reset').addEventListener('click', () => {
   $('card-results').classList.add('hidden');
-  ['suction-press','discharge-press','suction-temp','liquid-temp',
-   'return-db','return-wb','supply-temp','outdoor-temp'].forEach(id => {
-    $(id).value = '';
-  });
+  INPUT_IDS.forEach(id => { $(id).value = ''; });
   ['out-evap-sat','out-cond-sat','out-superheat','out-subcooling',
    'out-delta-t'].forEach(id => {
     $(id).textContent = id.replace('out-','— ').replace(/-/g,' ') + ': —';
   });
   $('out-comp-ratio').textContent = '—';
+  $('out-tesp').textContent = '— TESP: —';
   window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
 // ── Print ─────────────────────────────────────
 $('btn-print').addEventListener('click', () => window.print());
 
+// ══════════════════════════════════════════════
+// SAVE / LOAD JOBS  (localStorage)
+// ══════════════════════════════════════════════
+const JOBS_KEY = 'hvac_jobs';
+const SELECT_IDS = ['system-type','refrigerant','metering','rated-esp'];
+
+function getJobs() {
+  try { return JSON.parse(localStorage.getItem(JOBS_KEY)) || {}; }
+  catch { return {}; }
+}
+function saveJobs(jobs) { localStorage.setItem(JOBS_KEY, JSON.stringify(jobs)); }
+
+function snapshot() {
+  const data = { mode, _saved: new Date().toLocaleString() };
+  INPUT_IDS.forEach(id => data[id] = $(id).value);
+  SELECT_IDS.forEach(id => data[id] = $(id).value);
+  return data;
+}
+
+function applySnapshot(data) {
+  SELECT_IDS.forEach(id => { if (data[id] !== undefined) $(id).value = data[id]; });
+  INPUT_IDS.forEach(id => { if (data[id] !== undefined) $(id).value = data[id]; });
+  // restore mode
+  if (data.mode) {
+    mode = data.mode;
+    document.querySelectorAll('.mode-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.mode === mode));
+  }
+  updateLabels();
+  recalcLive();
+  recalcStatic();
+}
+
+function refreshJobList() {
+  const jobs = getJobs();
+  const sel = $('load-job-select');
+  const names = Object.keys(jobs).sort();
+  sel.innerHTML = '<option value="">Load saved job…</option>' +
+    names.map(n => `<option value="${n.replace(/"/g,'&quot;')}">${n}</option>`).join('');
+}
+
+$('btn-save-job').addEventListener('click', () => {
+  const name = $('job-name').value.trim();
+  if (!name) { alert('Enter a job / customer name before saving.'); return; }
+  const jobs = getJobs();
+  jobs[name] = snapshot();
+  saveJobs(jobs);
+  refreshJobList();
+  $('load-job-select').value = name;
+  alert(`Saved "${name}".`);
+});
+
+$('load-job-select').addEventListener('change', e => {
+  const name = e.target.value;
+  if (!name) return;
+  const jobs = getJobs();
+  if (jobs[name]) {
+    $('job-name').value = name;
+    applySnapshot(jobs[name]);
+  }
+});
+
+$('btn-delete-job').addEventListener('click', () => {
+  const name = $('load-job-select').value;
+  if (!name) { alert('Select a saved job to delete.'); return; }
+  if (!confirm(`Delete saved job "${name}"?`)) return;
+  const jobs = getJobs();
+  delete jobs[name];
+  saveJobs(jobs);
+  refreshJobList();
+});
+
 // ── Init ──────────────────────────────────────
 updateLabels();
 updateTargetDisplay();
+refreshJobList();
