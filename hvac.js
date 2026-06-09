@@ -50,6 +50,23 @@ function interpPT(table, psig) {
   return null;
 }
 
+// Reverse lookup: saturation °F → psig (for non-condensables standing test)
+function interpTP(table, tempF) {
+  if (tempF === null || tempF === '') return null;
+  const t = parseFloat(tempF);
+  if (isNaN(t)) return null;
+  if (t <= table[0][1]) return table[0][0];
+  if (t >= table[table.length-1][1]) return table[table.length-1][0];
+  for (let i = 0; i < table.length - 1; i++) {
+    const [p1, t1] = table[i];
+    const [p2, t2] = table[i+1];
+    if (t >= t1 && t <= t2) {
+      return p1 + (p2 - p1) * ((t - t1) / (t2 - t1));
+    }
+  }
+  return null;
+}
+
 // ── Helpers ───────────────────────────────────
 const $ = id => document.getElementById(id);
 const val = id => { const v = parseFloat($(id).value); return isNaN(v) ? null : v; };
@@ -219,6 +236,115 @@ function recalcStatic() {
 });
 ['supply-static','return-static','rated-esp'].forEach(id => {
   $(id).addEventListener('input', recalcStatic);
+});
+
+// ══════════════════════════════════════════════
+// SINGLE FINDING RENDERER (for inline tools)
+// ══════════════════════════════════════════════
+function findingHTML(f) {
+  return `
+    <div class="finding ${f.sev}">
+      <div class="finding-icon">${f.icon}</div>
+      <div class="finding-body">
+        <div class="finding-title">${f.title}</div>
+        <div class="finding-detail">${f.detail}</div>
+        ${f.causes && f.causes.length ? `
+          <div class="finding-causes"><ul>${f.causes.map(c=>`<li>${c}</li>`).join('')}</ul></div>` : ''}
+      </div>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════
+// NON-CONDENSABLES TEST
+// ══════════════════════════════════════════════
+function ncExpected() {
+  const ref = $('refrigerant').value;
+  const amb = val('nc-ambient');
+  const exp = interpTP(PT[ref], amb);
+  $('out-nc-expected').textContent = exp !== null
+    ? `Expected standing: ${exp.toFixed(0)} psig @ ${amb}°F`
+    : '— Expected standing: —';
+  return exp;
+}
+$('nc-ambient').addEventListener('input', ncExpected);
+$('refrigerant').addEventListener('change', ncExpected);
+
+$('btn-nc-check').addEventListener('click', () => {
+  const amb = val('nc-ambient');
+  const standing = val('nc-standing');
+  const out = $('nc-result');
+  if (amb === null || standing === null) {
+    out.innerHTML = findingHTML({ sev:'info', icon:'ℹ️',
+      title:'Enter ambient temp and standing pressure',
+      detail:'The system must be off long enough (often 30+ min, ideally overnight) for refrigerant temperature to equalize with the surrounding air.', causes:[] });
+    return;
+  }
+  const expected = interpTP(PT[$('refrigerant').value], amb);
+  if (expected === null) { out.innerHTML = ''; return; }
+  const diff = standing - expected;
+  if (diff > 10) {
+    out.innerHTML = findingHTML({ sev: diff > 25 ? 'crit' : 'warn', icon:'🫧',
+      title:`Non-Condensables Likely — standing ${standing.toFixed(0)} psig vs expected ${expected.toFixed(0)} psig (+${diff.toFixed(0)})`,
+      detail:'Standing pressure is meaningfully higher than the refrigerant\'s saturation pressure at this temperature. Air or nitrogen is most likely trapped in the system, which raises head pressure and reduces efficiency during operation.',
+      causes:[
+        'System opened without proper evacuation (air left in)',
+        'Incomplete vacuum / micron level not reached before charging',
+        'Leak on the low side allowing air ingestion under vacuum conditions',
+        'Recommended fix: recover, replace liquid line drier, evacuate to ≤500 microns with a decay test, then weigh in fresh charge',
+      ] });
+  } else if (diff < -10) {
+    out.innerHTML = findingHTML({ sev:'info', icon:'ℹ️',
+      title:`Standing pressure low — ${standing.toFixed(0)} psig vs expected ${expected.toFixed(0)} psig (${diff.toFixed(0)})`,
+      detail:'Standing pressure is below expected. This usually means the system is undercharged or has not fully equalized to ambient yet. Verify the system is truly off and settled, and check charge by weight.',
+      causes:[] });
+  } else {
+    out.innerHTML = findingHTML({ sev:'ok', icon:'✅',
+      title:`No Non-Condensables Indicated — standing ${standing.toFixed(0)} psig ≈ expected ${expected.toFixed(0)} psig`,
+      detail:'Standing pressure matches the refrigerant\'s saturation pressure for this ambient temperature (within ±10 psig). Air/nitrogen contamination is unlikely.',
+      causes:[] });
+  }
+});
+
+// ══════════════════════════════════════════════
+// LEAK RATE / EPA 608 HELPER
+// ══════════════════════════════════════════════
+$('btn-leak-check').addEventListener('click', () => {
+  const trigger    = parseFloat($('leak-appliance').value);
+  const fullCharge = val('leak-fullcharge');
+  const added      = val('leak-added');
+  const days       = val('leak-days');
+  const out = $('leak-result');
+
+  if (fullCharge === null || added === null || days === null || days <= 0 || fullCharge <= 0) {
+    out.innerHTML = findingHTML({ sev:'info', icon:'ℹ️',
+      title:'Enter full charge, refrigerant added, and days',
+      detail:'Days since last charge must be greater than zero. The full charge is the appliance\'s total normal operating charge from the data plate.', causes:[] });
+    return;
+  }
+
+  // Annualized leak rate (EPA method): (lbs added / full charge) × (365 / days) × 100
+  const annualRate = (added / fullCharge) * (365 / days) * 100;
+  const exceeded = annualRate > trigger;
+  const applianceName = $('leak-appliance').selectedOptions[0].text;
+  const note50 = fullCharge < 50
+    ? '<br><em>Note: EPA 608 leak-repair requirements apply to appliances with a full charge of 50 lbs or more. This unit is under 50 lbs, but tracking leaks is still good practice.</em>'
+    : '';
+
+  out.innerHTML = findingHTML({
+    sev: exceeded ? 'crit' : 'ok',
+    icon: exceeded ? '🧪' : '✅',
+    title: `Annualized Leak Rate: ${annualRate.toFixed(1)}% — Trigger for ${applianceName} is ${trigger}%`,
+    detail: (exceeded
+      ? `This rate <strong>exceeds</strong> the EPA 608 leak-rate trigger. For applicable appliances (≥50 lbs), a leak inspection and repair are required, with follow-up verification tests. Document the leak, repairs, and verification.`
+      : `This rate is below the EPA 608 leak-rate trigger. Continue to log refrigerant additions and monitor over time.`)
+      + `<br><br>Calculation: (${added} lbs ÷ ${fullCharge} lbs) × (365 ÷ ${days} days) × 100 = <strong>${annualRate.toFixed(1)}%</strong>` + note50,
+    causes: exceeded ? [
+      'Locate the leak (electronic detector, bubbles, UV dye, or nitrogen pressure test)',
+      'Common leak points: schrader cores, flare/braze joints, coil U-bends, line-set rub-outs',
+      'Repair, then perform initial + follow-up verification leak tests',
+      'Record leak rate, repair date, and verification results for compliance',
+    ] : []
+  });
 });
 
 // ══════════════════════════════════════════════

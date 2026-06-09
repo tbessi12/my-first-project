@@ -197,6 +197,60 @@
     </div>
   </section>
 
+  <!-- ── Non-Condensables Test ─────────────────── -->
+  <section class="card" id="card-noncond">
+    <h2 class="card-title">🫧 Non-Condensables Test <span class="optional">(system OFF, pressures equalized)</span></h2>
+    <p class="card-hint">With the system off long enough for pressures to equalize to ambient, compare the standing pressure to what the refrigerant <em>should</em> read at the surrounding temperature. A higher standing pressure means air/nitrogen is trapped in the system.</p>
+    <div class="readings-grid">
+      <div class="field">
+        <label>Ambient Temp at Unit <span class="unit">(°F)</span>
+          <span class="tip">temp of the air around the condenser</span>
+        </label>
+        <input type="number" id="nc-ambient" placeholder="e.g. 80" />
+        <div class="calc-out" id="out-nc-expected">— Expected standing: —</div>
+      </div>
+      <div class="field">
+        <label>Measured Standing Pressure <span class="unit">(psig)</span></label>
+        <input type="number" id="nc-standing" placeholder="e.g. 250" />
+      </div>
+      <div class="field">
+        <label>&nbsp;</label>
+        <button class="btn-secondary" id="btn-nc-check">Check for Non-Condensables</button>
+      </div>
+    </div>
+    <div id="nc-result"></div>
+  </section>
+
+  <!-- ── Leak Rate / EPA Helper ─────────────────── -->
+  <section class="card" id="card-leak">
+    <h2 class="card-title">🧪 Leak Rate / EPA 608 Helper <span class="optional">(optional)</span></h2>
+    <p class="card-hint">Estimate the annualized leak rate and compare it to the EPA 608 leak-rate trigger for the appliance type (applies to appliances with a full charge of 50 lbs or more).</p>
+    <div class="readings-grid">
+      <div class="field">
+        <label>Appliance Type</label>
+        <select id="leak-appliance">
+          <option value="10">Comfort Cooling (10%)</option>
+          <option value="20">Commercial Refrigeration (20%)</option>
+          <option value="30">Industrial Process Refrigeration (30%)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Full Charge <span class="unit">(lbs)</span></label>
+        <input type="number" id="leak-fullcharge" placeholder="e.g. 60" step="0.1" />
+      </div>
+      <div class="field">
+        <label>Refrigerant Added <span class="unit">(lbs)</span></label>
+        <input type="number" id="leak-added" placeholder="e.g. 8" step="0.1" />
+      </div>
+      <div class="field">
+        <label>Days Since Last Charge</label>
+        <input type="number" id="leak-days" placeholder="e.g. 90" />
+      </div>
+    </div>
+    <button class="btn-secondary" id="btn-leak-check" style="margin-top:1rem">Calculate Leak Rate</button>
+    <div id="leak-result"></div>
+  </section>
+
   <!-- ── STEP 3: Diagnosis ─────────────────────── -->
   <section class="card hidden" id="card-results">
     <h2 class="card-title">3 · Diagnosis</h2>

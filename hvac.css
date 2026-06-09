@@ -101,6 +101,18 @@ main {
   letter-spacing: 0;
 }
 
+.card-hint {
+  font-size: .85rem;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-bottom: 1.1rem;
+  margin-top: -.5rem;
+}
+
+/* Inline result blocks for non-cond & leak tools (reuse .finding styles) */
+#nc-result:not(:empty),
+#leak-result:not(:empty) { margin-top: 1.1rem; }
+
 .calc-out.big {
   font-size: 1.1rem;
   font-weight: 800;
